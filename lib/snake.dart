@@ -8,6 +8,10 @@ class SnakeModel {
   final List<Offset> points;
 
   SnakeModel({this.head, this.length, this.points});
+
+  Offset get direction {
+    return Offset.fromDirection((head - points.first).direction);
+  }
 }
 
 class _SnakePainter extends CustomPainter {
@@ -20,6 +24,21 @@ class _SnakePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     double tileSize = size.width / boardColumns;
+    Paint tileColor = Paint()
+      ..color = Colors.red.shade200
+      ..style = PaintingStyle.fill;
+
+    for (int y = 0; y < this.boardRows; y++) {
+      for (int x = 0; x < this.boardColumns; x++) {
+        canvas.drawRect(
+            Rect.fromCenter(
+                    center: Offset(x * tileSize, y * tileSize),
+                    width: tileSize,
+                    height: tileSize)
+                .deflate(2),
+            tileColor);
+      }
+    }
     Paint snakePaint = Paint()
       ..color = Colors.green
       ..style = PaintingStyle.stroke
