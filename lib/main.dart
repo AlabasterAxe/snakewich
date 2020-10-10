@@ -5,8 +5,8 @@ void main() {
   runApp(MyApp());
 }
 
-int BOARD_ROWS = 20;
-int BOARD_COLUMNS = 20;
+const int BOARD_ROWS = 20;
+const int BOARD_COLUMNS = 20;
 double snakeSpeedPPS = 5;
 
 class MyApp extends StatelessWidget {

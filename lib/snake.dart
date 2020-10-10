@@ -21,18 +21,23 @@ class _SnakePainter extends CustomPainter {
 
   _SnakePainter(this.snake, this.boardColumns, this.boardRows);
 
+  Offset bToP(Offset offset, Size size) {
+    double tileSize = size.width / boardColumns;
+    return offset * tileSize + Offset(tileSize / 2, tileSize / 2);
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     double tileSize = size.width / boardColumns;
     Paint tileColor = Paint()
-      ..color = Colors.red.shade200
+      ..color = Colors.red[200]
       ..style = PaintingStyle.fill;
 
     for (int y = 0; y < this.boardRows; y++) {
       for (int x = 0; x < this.boardColumns; x++) {
         canvas.drawRect(
             Rect.fromCenter(
-                    center: Offset(x * tileSize, y * tileSize),
+                    center: bToP(Offset(x.toDouble(), y.toDouble()), size),
                     width: tileSize,
                     height: tileSize)
                 .deflate(2),
@@ -46,21 +51,23 @@ class _SnakePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeWidth = tileSize;
 
-    Path snakePath = Path()
-      ..moveTo(snake.head.dx * tileSize, snake.head.dy * tileSize);
+    Offset snakeHeadPixel = bToP(snake.head, size);
+    Path snakePath = Path()..moveTo(snakeHeadPixel.dx, snakeHeadPixel.dy);
     Offset lastPoint = snake.head;
     double remainingLength = snake.length;
 
     for (var point in snake.points) {
       double segmentLength = (point - lastPoint).distance;
       if (segmentLength < remainingLength) {
-        snakePath.lineTo(point.dx * tileSize, point.dy * tileSize);
+        Offset snakePointPixel = bToP(point, size);
+        snakePath.lineTo(snakePointPixel.dx, snakePointPixel.dy);
         remainingLength -= segmentLength;
       } else {
         double segmentDirection = (point - lastPoint).direction;
-        Offset newPoint =
-            lastPoint + Offset.fromDirection(segmentDirection, remainingLength);
-        snakePath.lineTo(newPoint.dx * tileSize, newPoint.dy * tileSize);
+        Offset newPointPixels = bToP(
+            lastPoint + Offset.fromDirection(segmentDirection, remainingLength),
+            size);
+        snakePath.lineTo(newPointPixels.dx, newPointPixels.dy);
         break;
       }
       lastPoint = point;
