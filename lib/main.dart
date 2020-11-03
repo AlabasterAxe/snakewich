@@ -3,7 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:snakewich/model/direction.dart';
-import 'package:snakewich/snake.dart';
 import 'package:snakewich/views/snake-board.dart';
 
 void main() {
