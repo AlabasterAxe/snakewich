@@ -1,177 +1,128 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:snakewich/model/direction.dart';
 import 'package:snakewich/snake.dart';
+import 'package:snakewich/views/snake-board.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(SnakeApp());
 }
 
-const int BOARD_ROWS = 20;
-const int BOARD_COLUMNS = 20;
-double snakeSpeedPPS = 5;
-
-class MyApp extends StatelessWidget {
+class SnakeApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'SNAAAKE',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
         primarySwatch: Colors.blue,
-        // This makes the visual density adapt to the platform that you run
-        // the app on. For desktop platforms, the controls will be smaller and
-        // closer together (more dense) than on mobile platforms.
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: SnakeGame(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  final String title;
-
+class SnakeGame extends StatefulWidget {
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  SnakeGameState createState() => SnakeGameState();
 }
 
-class _MyHomePageState extends State<MyHomePage>
-    with SingleTickerProviderStateMixin {
-  AnimationController worldController;
-  SnakeModel snake;
-  int lastUpdateMillis;
-  List<Offset> upcomingSwipes;
-  Offset targetPoint;
+class SnakeGameState extends State<SnakeGame> {
+  Random r = new Random();
 
-  List<Offset> applePositions = [];
+  SnakeBoard board;
+  List<SnakeBoardTile> snake;
+  List<SnakeBoardTile> apples;
+  Direction snakeDirection;
+
+  List<Direction> swipes;
+
+  Timer updateTimer;
+
+  int appleCountdown;
 
   @override
   void initState() {
     super.initState();
-    worldController =
-        AnimationController(vsync: this, duration: Duration(days: 10000));
-    worldController.addListener(_update);
     _reset();
   }
 
   void _reset() {
-    snake = SnakeModel(head: Offset(5, 10), length: 4, points: [
-      Offset(1, 10),
-    ]);
-    lastUpdateMillis = 0;
-    upcomingSwipes = [];
-    applePositions = [Offset(3.0, 7.0)];
+    board = SnakeBoard(20, 20);
+    snake = [board.tiles[5][3], board.tiles[5][2]];
+    apples = [];
+    snakeDirection = Direction.east;
+    swipes = [];
+    appleCountdown = 4 + r.nextInt(10);
+    updateTimer = Timer.periodic(Duration(milliseconds: 600), _update);
   }
 
-  void _update() {
-    if (!worldController.isAnimating) {
-      return;
-    }
-
-    double elapsedTimeSeconds =
-        (worldController.lastElapsedDuration.inMilliseconds -
-                lastUpdateMillis) /
-            1000;
-    if (upcomingSwipes.isNotEmpty) {
-      if (targetPoint == null) {
-        targetPoint = (snake.head + snake.direction / 2);
-        targetPoint = Offset(
-            targetPoint.dx.roundToDouble(), targetPoint.dy.roundToDouble());
+  void _update(Timer timer) {
+    setState(() {
+      if (swipes.isNotEmpty) {
+        snakeDirection = swipes.first;
+        swipes.removeAt(0);
       }
-      Offset targetOffset = targetPoint - snake.head;
-      Offset directionToTarget = Offset.fromDirection(targetOffset.direction);
-      if (snake.direction.dx.round() == 0 &&
-              (snake.direction.dy + directionToTarget.dy).round() == 0 ||
-          snake.direction.dy.round() == 0 &&
-              (snake.direction.dx + directionToTarget.dx).round() == 0) {
-        Offset newHead =
-            targetPoint + upcomingSwipes[0] * targetOffset.distance;
-        snake = SnakeModel(
-            head: newHead,
-            length: snake.length,
-            points: [targetPoint] + snake.points);
-        targetPoint = null;
-        upcomingSwipes.removeAt(0);
+      SnakeBoardTile newHead = snake.first.getNeighbor(snakeDirection);
+      int tailLength = snake.length - 1;
+      SnakeBoardTile consumedApple = apples
+          .firstWhere((element) => element == newHead, orElse: () => null);
+      if (consumedApple != null) {
+        tailLength++;
+        apples.remove(consumedApple);
       }
-    }
-    snake = SnakeModel(
-        head: snake.head +
-            (snake.direction * (snakeSpeedPPS * elapsedTimeSeconds)),
-        length: snake.length,
-        points: snake.points);
-
-    lastUpdateMillis = worldController.lastElapsedDuration.inMilliseconds;
+      snake = [newHead] + snake.take(tailLength).toList();
+      appleCountdown--;
+      if (appleCountdown == 0) {
+        appleCountdown = 4 + r.nextInt(10);
+        List<SnakeBoardTile> eligibleApplePositions =
+            board.tiles.expand((e) => e).toList();
+        snake.forEach((element) {
+          eligibleApplePositions.remove(element);
+        });
+        apples.add(
+            eligibleApplePositions[r.nextInt(eligibleApplePositions.length)]);
+      }
+    });
   }
 
-  void _start() {
-    worldController.forward();
-  }
-
-  void _swipe(Offset swipeDirection) {
-    if (!worldController.isAnimating) {
-      _start();
-    } else {
-      Offset comparisonDirection =
-          upcomingSwipes.isEmpty ? snake.direction : upcomingSwipes.last;
-      if (swipeDirection.dy.round() != 0 &&
-              comparisonDirection.dx.round() != 0 ||
-          swipeDirection.dx.round() != 0 &&
-              comparisonDirection.dy.round() != 0) {
-        upcomingSwipes.add(swipeDirection);
-      }
+  void _swipe(Direction direction) {
+    if ((swipes.isEmpty && direction.isOrthogonal(snakeDirection)) ||
+        (swipes.isNotEmpty && swipes.last.isOrthogonal(direction))) {
+      swipes.add(direction);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    Size size = MediaQuery.of(context).size;
-    double tileSize = size.width / BOARD_COLUMNS;
     return Scaffold(
       body: Center(
         child: GestureDetector(
           onVerticalDragEnd: (details) {
             if (details.velocity.pixelsPerSecond.distance > 20) {
-              _swipe(Offset(0, details.primaryVelocity.sign));
+              _swipe(details.velocity.pixelsPerSecond.dy < 0
+                  ? Direction.north
+                  : Direction.south);
             }
           },
           onHorizontalDragEnd: (details) {
             if (details.velocity.pixelsPerSecond.distance > 20) {
-              _swipe(Offset(details.primaryVelocity.sign, 0));
+              _swipe(details.velocity.pixelsPerSecond.dx < 0
+                  ? Direction.west
+                  : Direction.east);
             }
           },
           child: AspectRatio(
-            aspectRatio: BOARD_COLUMNS / BOARD_ROWS,
-            child: Stack(
-              children: <Widget>[
-                    Positioned.fill(
-                        child: AnimatedBuilder(
-                            animation: worldController,
-                            builder: (context, _) {
-                              return SnakeWidget(
-                                snake: snake,
-                                boardColumns: BOARD_COLUMNS,
-                                boardRows: BOARD_ROWS,
-                              );
-                            }))
-                  ] +
-                  applePositions
-                      .map((e) => Positioned(
-                          left: e.dx * tileSize,
-                          top: e.dy * tileSize,
-                          child: Container(
-                              width: 25, height: 25, color: Colors.blue)))
-                      .toList(),
-            ),
+            aspectRatio: board.width / board.height,
+            child: Stack(children: <Widget>[
+              Positioned.fill(
+                  child: CustomPaint(
+                      painter: SnakePainter(
+                          board: board, snake: snake, apples: apples)))
+            ]),
           ),
         ),
       ),
