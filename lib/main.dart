@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+Color bgColor = Color.fromARGB(255, 168, 214, 0);
 Color pixelColor = Color.fromARGB(255, 32, 65, 0);
 
 void main() {
@@ -68,6 +69,13 @@ class Coord {
   int get hashCode => x * 31 + y;
 }
 
+class SnakePart {
+  final Coord coord;
+  final bool apple;
+
+  SnakePart(this.coord, this.apple);
+}
+
 class SnakeGame extends StatefulWidget {
   @override
   SnakeGameState createState() => SnakeGameState();
@@ -76,17 +84,16 @@ class SnakeGame extends StatefulWidget {
 class SnakeGameState extends State<SnakeGame> {
   Random r = new Random();
 
-  int width;
-  int height;
-  List<Coord> snake;
-  Direction snakeDirection;
-
-  List<Direction> swipes;
-
   Timer updateTimer;
 
-  int appleCountdown;
+  int width;
+  int height;
+  List<SnakePart> snake;
+  Direction snakeDirection;
+
   Coord apple;
+
+  List<Direction> swipes;
 
   int score = 0;
   bool gameOver = false;
@@ -97,15 +104,26 @@ class SnakeGameState extends State<SnakeGame> {
     _reset();
   }
 
+  @override
+  void dispose() {
+    if (updateTimer != null) {
+      updateTimer.cancel();
+    }
+    super.dispose();
+  }
+
   void _reset() {
     score = 0;
     width = 20;
     height = 20;
-    snake = [Coord(5, 3), Coord(4, 3), Coord(3, 3)];
+    snake = [
+      SnakePart(Coord(5, 3), false),
+      SnakePart(Coord(4, 3), false),
+      SnakePart(Coord(3, 3), false)
+    ];
     apple = _getCoordForApple();
     snakeDirection = Direction.east;
     swipes = [];
-    appleCountdown = 4 + r.nextInt(10);
     updateTimer = Timer.periodic(Duration(milliseconds: 600), _update);
     gameOver = false;
   }
@@ -116,14 +134,15 @@ class SnakeGameState extends State<SnakeGame> {
         snakeDirection = swipes.first;
         swipes.removeAt(0);
       }
-      Coord newHead = snake.first.getNeighbor(snakeDirection);
+      Coord newHead = snake.first.coord.getNeighbor(snakeDirection);
+      bool eatingApple = apple == newHead;
       int tailLength = snake.length - 1;
-      if (apple == newHead) {
+      if (eatingApple) {
         score += 15;
         tailLength++;
-        apple = null;
+        apple = _getCoordForApple();
       }
-      snake = [newHead, ...snake.take(tailLength)];
+      snake = [SnakePart(newHead, eatingApple), ...snake.take(tailLength)];
       if (newHead.x < 0 ||
           newHead.y < 0 ||
           newHead.x >= width ||
@@ -132,9 +151,6 @@ class SnakeGameState extends State<SnakeGame> {
         timer.cancel();
         gameOver = true;
         return;
-      }
-      if (apple == null) {
-        apple = _getCoordForApple();
       }
     });
   }
@@ -157,7 +173,7 @@ class SnakeGameState extends State<SnakeGame> {
 
   @override
   Widget build(BuildContext context) {
-    Widget innerGame = CustomPaint(
+    Widget game = CustomPaint(
         painter: SnakePainter(
             width: width,
             height: height,
@@ -165,8 +181,8 @@ class SnakeGameState extends State<SnakeGame> {
             snakeDirection: snakeDirection,
             apple: apple));
     if (gameOver) {
-      innerGame = Stack(fit: StackFit.expand, children: [
-        innerGame,
+      game = Stack(fit: StackFit.expand, children: [
+        game,
         Center(
             child: Text(
           "GAME OVER",
@@ -174,20 +190,20 @@ class SnakeGameState extends State<SnakeGame> {
         ))
       ]);
     }
-    innerGame = Container(
+    game = Container(
         padding: EdgeInsets.all(4),
         decoration:
             BoxDecoration(border: Border.all(color: pixelColor, width: 4)),
-        child: AspectRatio(aspectRatio: width / height, child: innerGame));
+        child: AspectRatio(aspectRatio: width / height, child: game));
     if (gameOver) {
-      innerGame = GestureDetector(
-        child: innerGame,
+      game = GestureDetector(
+        child: game,
         onTap: () {
           _reset();
         },
       );
     } else {
-      innerGame = GestureDetector(
+      game = GestureDetector(
         onVerticalDragEnd: (details) {
           if (gameOver) {
             _reset();
@@ -210,11 +226,11 @@ class SnakeGameState extends State<SnakeGame> {
             }
           }
         },
-        child: innerGame,
+        child: game,
       );
     }
     return Scaffold(
-      backgroundColor: Color.fromARGB(255, 168, 214, 0),
+      backgroundColor: bgColor,
       body: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -225,7 +241,7 @@ class SnakeGameState extends State<SnakeGame> {
                 "$score",
                 textAlign: TextAlign.left,
               ),
-              innerGame
+              game
             ]),
       ),
     );
@@ -236,6 +252,7 @@ enum PixelArt {
   snakeHead,
   snakeHeadWithMouthOpen,
   snakeBody,
+  snakeBodyWithApple,
   snakeBodyTurn,
   snakeTail,
   apple
@@ -258,6 +275,12 @@ const Map<PixelArt, List<List<bool>>> pixelArt = {
     [true, true, false, true],
     [true, false, true, true],
     [false, false, false, false]
+  ],
+  PixelArt.snakeBodyWithApple: [
+    [false, true, true, false],
+    [true, true, false, true],
+    [true, false, true, true],
+    [false, true, true, false]
   ],
   PixelArt.snakeBodyTurn: [
     [false, false, false, false],
@@ -285,11 +308,14 @@ List<List<bool>> flipV(List<List<bool>> v) => v.reversed.toList();
 List<List<bool>> rotCCW(List<List<bool>> v) =>
     List.generate(4, (x) => List.generate(4, (y) => v[y][x])).reversed.toList();
 
-List<List<bool>> getBodySegment(List<Coord> snake, int segment) {
-  Direction head = snake[segment].directionTo(snake[segment - 1]);
-  Direction tail = snake[segment + 1].directionTo(snake[segment]);
+List<List<bool>> getBodySegment(List<SnakePart> snake, int segment) {
+  SnakePart seg = snake[segment];
+  Direction head = seg.coord.directionTo(snake[segment - 1].coord);
+  Direction tail = snake[segment + 1].coord.directionTo(seg.coord);
   if (head == tail) {
-    return faceDirection(pixelArt[PixelArt.snakeBody], head);
+    return faceDirection(
+        pixelArt[seg.apple ? PixelArt.snakeBodyWithApple : PixelArt.snakeBody],
+        head);
   }
   switch (head) {
     case Direction.north:
@@ -328,7 +354,7 @@ class SnakePainter extends CustomPainter {
   final Paint pixelPaint;
   final int width;
   final int height;
-  final List<Coord> snake;
+  final List<SnakePart> snake;
   final Direction snakeDirection;
   final Coord apple;
 
@@ -348,24 +374,24 @@ class SnakePainter extends CustomPainter {
     drawPixelTile(
         canvas,
         faceDirection(
-            pixelArt[snake.first.getNeighbor(snakeDirection) == apple
+            pixelArt[snake.first.coord.getNeighbor(snakeDirection) == apple
                 ? PixelArt.snakeHeadWithMouthOpen
                 : PixelArt.snakeHead],
             snakeDirection),
-        snake.first.x,
-        snake.first.y,
+        snake.first.coord.x,
+        snake.first.coord.y,
         tileSize,
         pixelPaint);
     for (int segment = 1; segment < snake.length - 1; segment++) {
-      drawPixelTile(canvas, getBodySegment(snake, segment), snake[segment].x,
-          snake[segment].y, tileSize, pixelPaint);
+      drawPixelTile(canvas, getBodySegment(snake, segment),
+          snake[segment].coord.x, snake[segment].coord.y, tileSize, pixelPaint);
     }
     drawPixelTile(
         canvas,
         faceDirection(pixelArt[PixelArt.snakeTail],
-            snake.last.directionTo(snake[snake.length - 2])),
-        snake.last.x,
-        snake.last.y,
+            snake.last.coord.directionTo(snake[snake.length - 2].coord)),
+        snake.last.coord.x,
+        snake.last.coord.y,
         tileSize,
         pixelPaint);
   }
