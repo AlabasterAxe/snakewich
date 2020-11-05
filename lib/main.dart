@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 Color pixelColor = Color.fromARGB(255, 32, 65, 0);
 
@@ -14,6 +15,7 @@ class SnakeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SNAAAKE',
+      theme: ThemeData(textTheme: GoogleFonts.pressStart2pTextTheme()),
       home: SnakeGame(),
     );
   }
@@ -51,6 +53,17 @@ class Coord {
           : d == Direction.south
               ? y + 1
               : y);
+
+  Direction directionTo(Coord c) {
+    if (c.y == y) {
+      return c.x < x ? Direction.west : Direction.east;
+    } else if (c.x == x) {
+      return c.y < y ? Direction.north : Direction.south;
+    } else {
+      throw new Exception("invalid coordinates");
+    }
+  }
+
   bool operator ==(obj) => obj is Coord && obj.x == x && obj.y == y;
   int get hashCode => x * 31 + y;
 }
@@ -75,6 +88,8 @@ class SnakeGameState extends State<SnakeGame> {
   int appleCountdown;
   Coord apple;
 
+  bool gameOver = false;
+
   @override
   void initState() {
     super.initState();
@@ -90,6 +105,7 @@ class SnakeGameState extends State<SnakeGame> {
     swipes = [];
     appleCountdown = 4 + r.nextInt(10);
     updateTimer = Timer.periodic(Duration(milliseconds: 600), _update);
+    gameOver = false;
   }
 
   void _update(Timer timer) {
@@ -105,6 +121,15 @@ class SnakeGameState extends State<SnakeGame> {
         apple = null;
       }
       snake = [newHead, ...snake.take(tailLength)];
+      if (newHead.x < 0 ||
+          newHead.y < 0 ||
+          newHead.x > width ||
+          newHead.y > height ||
+          snake.skip(1).contains(newHead)) {
+        timer.cancel();
+        gameOver = true;
+        return;
+      }
       if (apple == null) {
         apple = _getCoordForApple();
       }
@@ -129,40 +154,58 @@ class SnakeGameState extends State<SnakeGame> {
 
   @override
   Widget build(BuildContext context) {
+    Widget innerGame = CustomPaint(
+        painter: SnakePainter(
+            width: width,
+            height: height,
+            snake: snake,
+            snakeDirection: snakeDirection,
+            apple: apple));
+    if (gameOver) {
+      innerGame = Stack(fit: StackFit.expand, children: [
+        innerGame,
+        Center(
+            child: Text(
+          "GAME OVER",
+          style: TextStyle(color: pixelColor),
+        ))
+      ]);
+    }
+    innerGame = Container(
+        padding: EdgeInsets.all(16),
+        decoration:
+            BoxDecoration(border: Border.all(color: pixelColor, width: 4)),
+        child: AspectRatio(aspectRatio: width / height, child: innerGame));
     return Scaffold(
       backgroundColor: Color.fromARGB(255, 168, 214, 0),
-      body: Center(
-        child: GestureDetector(
-            onVerticalDragEnd: (details) {
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(
+            child: GestureDetector(
+          onVerticalDragEnd: (details) {
+            if (gameOver) {
+              _reset();
+            } else {
               if (details.velocity.pixelsPerSecond.distance > 20) {
                 _swipe(details.velocity.pixelsPerSecond.dy < 0
                     ? Direction.north
                     : Direction.south);
               }
-            },
-            onHorizontalDragEnd: (details) {
+            }
+          },
+          onHorizontalDragEnd: (details) {
+            if (gameOver) {
+              _reset();
+            } else {
               if (details.velocity.pixelsPerSecond.distance > 20) {
                 _swipe(details.velocity.pixelsPerSecond.dx < 0
                     ? Direction.west
                     : Direction.east);
               }
-            },
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: pixelColor, width: 4)),
-                  child: AspectRatio(
-                      aspectRatio: width / height,
-                      child: CustomPaint(
-                          painter: SnakePainter(
-                              width: width,
-                              height: height,
-                              snake: snake,
-                              snakeDirection: snakeDirection,
-                              apple: apple)))),
-            )),
+            }
+          },
+          child: innerGame,
+        )),
       ),
     );
   }
@@ -220,6 +263,33 @@ List<List<bool>> flipH(List<List<bool>> v) =>
 List<List<bool>> flipV(List<List<bool>> v) => v.reversed.toList();
 List<List<bool>> rotCCW(List<List<bool>> v) =>
     List.generate(4, (x) => List.generate(4, (y) => v[y][x])).reversed.toList();
+
+List<List<bool>> getBodySegment(List<Coord> snake, int segment) {
+  Direction head = snake[segment].directionTo(snake[segment - 1]);
+  Direction tail = snake[segment + 1].directionTo(snake[segment]);
+  if (head == tail) {
+    return faceDirection(pixelArt[PixelArt.snakeBody], head);
+  }
+  switch (head) {
+    case Direction.north:
+      return tail == Direction.east
+          ? flipV(flipH(pixelArt[PixelArt.snakeBodyTurn]))
+          : flipV(pixelArt[PixelArt.snakeBodyTurn]);
+    case Direction.east:
+      return tail == Direction.north
+          ? pixelArt[PixelArt.snakeBodyTurn]
+          : flipV(pixelArt[PixelArt.snakeBodyTurn]);
+    case Direction.south:
+      return tail == Direction.east
+          ? flipH(pixelArt[PixelArt.snakeBodyTurn])
+          : pixelArt[PixelArt.snakeBodyTurn];
+    case Direction.west:
+      return tail == Direction.north
+          ? flipH(pixelArt[PixelArt.snakeBodyTurn])
+          : flipV(flipH(pixelArt[PixelArt.snakeBodyTurn]));
+  }
+}
+
 List<List<bool>> faceDirection(List<List<bool>> v, Direction d) {
   switch (d) {
     case Direction.north:
@@ -233,65 +303,8 @@ List<List<bool>> faceDirection(List<List<bool>> v, Direction d) {
   }
 }
 
-List<List<bool>> getBodySegment(List<Coord> snake, int segment) {
-  Coord closerToHead = snake[segment - 1];
-  Coord curr = snake[segment];
-  Coord closerToTail = snake[segment + 1];
-  if (closerToHead.y == closerToTail.y) {
-    if (closerToHead.x > closerToTail.x) {
-      return pixelArt[PixelArt.snakeBody];
-    } else {
-      return flipH(pixelArt[PixelArt.snakeBody]);
-    }
-  } else if (closerToHead.x == closerToTail.x) {
-    if (closerToHead.y < closerToTail.y) {
-      return flipV(rotCCW(pixelArt[PixelArt.snakeBody]));
-    } else {
-      return rotCCW(pixelArt[PixelArt.snakeBody]);
-    }
-  } else if (closerToHead.y < curr.y) {
-    if (closerToTail.x > curr.x) {
-      return flipV(pixelArt[PixelArt.snakeBodyTurn]);
-    } else {
-      return flipV(flipH(pixelArt[PixelArt.snakeBodyTurn]));
-    }
-  } else if (closerToHead.y > curr.y) {
-    if (closerToTail.x < curr.x) {
-      return flipH(pixelArt[PixelArt.snakeBodyTurn]);
-    } else {
-      return pixelArt[PixelArt.snakeBodyTurn];
-    }
-  } else if (closerToHead.x < curr.x) {
-    if (closerToTail.y < curr.y) {
-      return flipV(flipH(pixelArt[PixelArt.snakeBodyTurn]));
-    } else {
-      return flipH(pixelArt[PixelArt.snakeBodyTurn]);
-    }
-  } else if (closerToHead.x > curr.x) {
-    if (closerToTail.y < curr.y) {
-      return flipV(pixelArt[PixelArt.snakeBodyTurn]);
-    } else {
-      return pixelArt[PixelArt.snakeBodyTurn];
-    }
-  }
-  return pixelArt[PixelArt.snakeBody];
-}
-
-List<List<bool>> getTail(List<Coord> snake) {
-  Coord tail = snake.last;
-  Coord prev = snake[snake.length - 2];
-  if (prev.x > tail.x) {
-    return pixelArt[PixelArt.snakeTail];
-  } else if (prev.x < tail.x) {
-    return flipH(pixelArt[PixelArt.snakeTail]);
-  } else if (prev.y > tail.y) {
-    return flipV(rotCCW(pixelArt[PixelArt.snakeTail]));
-  } else {
-    return rotCCW(pixelArt[PixelArt.snakeTail]);
-  }
-}
-
 class SnakePainter extends CustomPainter {
+  final Paint pixelPaint;
   final int width;
   final int height;
   final List<Coord> snake;
@@ -299,14 +312,25 @@ class SnakePainter extends CustomPainter {
   final Coord apple;
 
   SnakePainter(
-      {this.width, this.height, this.snake, this.snakeDirection, this.apple});
+      {this.width, this.height, this.snake, this.snakeDirection, this.apple})
+      : pixelPaint = Paint()..color = Color.fromARGB(255, 32, 65, 0);
+
   @override
   void paint(Canvas canvas, Size size) {
-    Paint pixelPaint = Paint()..color = Color.fromARGB(255, 32, 65, 0);
     double tileSize = size.width / width;
+    drawSnake(canvas, tileSize);
+    drawPixelTile(canvas, pixelArt[PixelArt.apple], apple.x, apple.y, tileSize,
+        pixelPaint);
+  }
+
+  void drawSnake(Canvas canvas, double tileSize) {
     drawPixelTile(
         canvas,
-        faceDirection(pixelArt[PixelArt.snakeHead], snakeDirection),
+        faceDirection(
+            pixelArt[snake.first.getNeighbor(snakeDirection) == apple
+                ? PixelArt.snakeHeadWithMouthOpen
+                : PixelArt.snakeHead],
+            snakeDirection),
         snake.first.x,
         snake.first.y,
         tileSize,
@@ -315,9 +339,13 @@ class SnakePainter extends CustomPainter {
       drawPixelTile(canvas, getBodySegment(snake, segment), snake[segment].x,
           snake[segment].y, tileSize, pixelPaint);
     }
-    drawPixelTile(canvas, getTail(snake), snake.last.x, snake.last.y, tileSize,
-        pixelPaint);
-    drawPixelTile(canvas, pixelArt[PixelArt.apple], apple.x, apple.y, tileSize,
+    drawPixelTile(
+        canvas,
+        faceDirection(pixelArt[PixelArt.snakeTail],
+            snake.last.directionTo(snake[snake.length - 2])),
+        snake.last.x,
+        snake.last.y,
+        tileSize,
         pixelPaint);
   }
 
