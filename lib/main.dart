@@ -88,6 +88,7 @@ class SnakeGameState extends State<SnakeGame> {
   int appleCountdown;
   Coord apple;
 
+  int score = 0;
   bool gameOver = false;
 
   @override
@@ -97,6 +98,7 @@ class SnakeGameState extends State<SnakeGame> {
   }
 
   void _reset() {
+    score = 0;
     width = 20;
     height = 20;
     snake = [Coord(5, 3), Coord(4, 3), Coord(3, 3)];
@@ -117,14 +119,15 @@ class SnakeGameState extends State<SnakeGame> {
       Coord newHead = snake.first.getNeighbor(snakeDirection);
       int tailLength = snake.length - 1;
       if (apple == newHead) {
+        score += 15;
         tailLength++;
         apple = null;
       }
       snake = [newHead, ...snake.take(tailLength)];
       if (newHead.x < 0 ||
           newHead.y < 0 ||
-          newHead.x > width ||
-          newHead.y > height ||
+          newHead.x >= width ||
+          newHead.y >= height ||
           snake.skip(1).contains(newHead)) {
         timer.cancel();
         gameOver = true;
@@ -172,40 +175,58 @@ class SnakeGameState extends State<SnakeGame> {
       ]);
     }
     innerGame = Container(
-        padding: EdgeInsets.all(16),
+        padding: EdgeInsets.all(4),
         decoration:
             BoxDecoration(border: Border.all(color: pixelColor, width: 4)),
         child: AspectRatio(aspectRatio: width / height, child: innerGame));
+    if (gameOver) {
+      innerGame = GestureDetector(
+        child: innerGame,
+        onTap: () {
+          _reset();
+        },
+      );
+    } else {
+      innerGame = GestureDetector(
+        onVerticalDragEnd: (details) {
+          if (gameOver) {
+            _reset();
+          } else {
+            if (details.velocity.pixelsPerSecond.distance > 20) {
+              _swipe(details.velocity.pixelsPerSecond.dy < 0
+                  ? Direction.north
+                  : Direction.south);
+            }
+          }
+        },
+        onHorizontalDragEnd: (details) {
+          if (gameOver) {
+            _reset();
+          } else {
+            if (details.velocity.pixelsPerSecond.distance > 20) {
+              _swipe(details.velocity.pixelsPerSecond.dx < 0
+                  ? Direction.west
+                  : Direction.east);
+            }
+          }
+        },
+        child: innerGame,
+      );
+    }
     return Scaffold(
       backgroundColor: Color.fromARGB(255, 168, 214, 0),
       body: Padding(
         padding: EdgeInsets.all(16),
-        child: Center(
-            child: GestureDetector(
-          onVerticalDragEnd: (details) {
-            if (gameOver) {
-              _reset();
-            } else {
-              if (details.velocity.pixelsPerSecond.distance > 20) {
-                _swipe(details.velocity.pixelsPerSecond.dy < 0
-                    ? Direction.north
-                    : Direction.south);
-              }
-            }
-          },
-          onHorizontalDragEnd: (details) {
-            if (gameOver) {
-              _reset();
-            } else {
-              if (details.velocity.pixelsPerSecond.distance > 20) {
-                _swipe(details.velocity.pixelsPerSecond.dx < 0
-                    ? Direction.west
-                    : Direction.east);
-              }
-            }
-          },
-          child: innerGame,
-        )),
+        child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                "$score",
+                textAlign: TextAlign.left,
+              ),
+              innerGame
+            ]),
       ),
     );
   }
