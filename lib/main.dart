@@ -74,6 +74,9 @@ class SnakePart {
   final bool apple;
 
   SnakePart(this.coord, this.apple);
+
+  int get x => coord.x;
+  int get y => coord.y;
 }
 
 class SnakeGame extends StatefulWidget {
@@ -378,20 +381,20 @@ class SnakePainter extends CustomPainter {
                 ? PixelArt.snakeHeadWithMouthOpen
                 : PixelArt.snakeHead],
             snakeDirection),
-        snake.first.coord.x,
-        snake.first.coord.y,
+        snake.first.x,
+        snake.first.y,
         tileSize,
         pixelPaint);
     for (int segment = 1; segment < snake.length - 1; segment++) {
-      drawPixelTile(canvas, getBodySegment(snake, segment),
-          snake[segment].coord.x, snake[segment].coord.y, tileSize, pixelPaint);
+      drawPixelTile(canvas, getBodySegment(snake, segment), snake[segment].x,
+          snake[segment].y, tileSize, pixelPaint);
     }
     drawPixelTile(
         canvas,
         faceDirection(pixelArt[PixelArt.snakeTail],
             snake.last.coord.directionTo(snake[snake.length - 2].coord)),
-        snake.last.coord.x,
-        snake.last.coord.y,
+        snake.last.x,
+        snake.last.y,
         tileSize,
         pixelPaint);
   }
