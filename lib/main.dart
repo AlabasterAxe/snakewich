@@ -28,25 +28,11 @@ class SnakeApp extends StatelessWidget {
 
 enum Direction { north, east, south, west }
 
-Direction fromOffset(Offset o) {
-  if (o.dx.abs() > o.dy.abs()) {
-    return o.dx > 0 ? Direction.east : Direction.west;
-  } else {
-    return o.dy > 0 ? Direction.south : Direction.north;
-  }
-}
-
 extension DirectionUtil on Direction {
-  bool isOrthogonal(Direction d) {
-    switch (this) {
-      case Direction.north:
-      case Direction.south:
-        return d == Direction.east || d == Direction.west;
-      case Direction.west:
-      case Direction.east:
-        return d == Direction.south || d == Direction.north;
-    }
-  }
+  bool isOrthogonal(Direction d) =>
+      this == Direction.north || this == Direction.south
+          ? d == Direction.east || d == Direction.west
+          : d == Direction.south || d == Direction.north;
 }
 
 class Coord {
@@ -139,8 +125,7 @@ class SnakeGameState extends State<SnakeGame> {
   void _update(Timer timer) {
     setState(() {
       if (swipes.isNotEmpty) {
-        snakeDirection = swipes.first;
-        swipes.removeAt(0);
+        snakeDirection = swipes.removeAt(0);
       }
       Coord newHead = snake.first.coord.getNeighbor(snakeDirection);
       if (newHead == apple) {
@@ -157,7 +142,6 @@ class SnakeGameState extends State<SnakeGame> {
           snake.skip(1).map((c) => c.coord).contains(newHead)) {
         timer.cancel();
         gameOver = true;
-        return;
       }
     });
   }
@@ -173,7 +157,14 @@ class SnakeGameState extends State<SnakeGame> {
 
   void _swipe(DragEndDetails details) {
     if (details.velocity.pixelsPerSecond.distance > 20) {
-      Direction direction = fromOffset(details.velocity.pixelsPerSecond);
+      Offset pps = details.velocity.pixelsPerSecond;
+      Direction direction = pps.dx.abs() > pps.dy.abs()
+          ? pps.dx > 0
+              ? Direction.east
+              : Direction.west
+          : pps.dy > 0
+              ? Direction.south
+              : Direction.north;
       if ((swipes.isEmpty && direction.isOrthogonal(snakeDirection)) ||
           (swipes.isNotEmpty && swipes.last.isOrthogonal(direction))) {
         swipes.add(direction);
@@ -322,12 +313,12 @@ class SnakePainter extends CustomPainter {
   }
 
   List<List<bool>> getBodySegment(List<SnakePart> snake, int segment) {
-    SnakePart seg = snake[segment];
-    Direction head = seg.coord.directionTo(snake[segment - 1].coord);
-    Direction tail = snake[segment + 1].coord.directionTo(seg.coord);
+    SnakePart part = snake[segment];
+    Direction head = part.coord.directionTo(snake[segment - 1].coord);
+    Direction tail = snake[segment + 1].coord.directionTo(part.coord);
     if (head == tail) {
       return faceDirection(
-          seg.apple ? snakeBodyWithApplePixels : snakeBodyPixels, head);
+          part.apple ? snakeBodyWithApplePixels : snakeBodyPixels, head);
     }
     switch (head) {
       case Direction.north:
