@@ -16,7 +16,9 @@ class SnakeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SNAAAKE',
-      theme: ThemeData(textTheme: GoogleFonts.pressStart2pTextTheme()),
+      theme: ThemeData(
+          textTheme:
+              GoogleFonts.pressStart2pTextTheme().apply(bodyColor: pixelColor)),
       home: SnakeGame(),
     );
   }
@@ -189,7 +191,6 @@ class SnakeGameState extends State<SnakeGame> {
         Center(
             child: Text(
           "GAME OVER",
-          style: TextStyle(color: pixelColor),
         ))
       ]);
     }
