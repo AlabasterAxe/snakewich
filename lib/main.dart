@@ -138,10 +138,10 @@ class SnakeGameState extends State<SnakeGame> {
         swipes.removeAt(0);
       }
       Coord newHead = snake.first.coord.getNeighbor(snakeDirection);
-      bool eatingApple = apple == newHead;
       int tailLength = snake.length - 1;
+      bool eatingApple = apple == newHead;
       if (eatingApple) {
-        score += 15;
+        score += 4;
         tailLength++;
         apple = _getCoordForApple();
       }
@@ -208,25 +208,17 @@ class SnakeGameState extends State<SnakeGame> {
     } else {
       game = GestureDetector(
         onVerticalDragEnd: (details) {
-          if (gameOver) {
-            _reset();
-          } else {
-            if (details.velocity.pixelsPerSecond.distance > 20) {
-              _swipe(details.velocity.pixelsPerSecond.dy < 0
-                  ? Direction.north
-                  : Direction.south);
-            }
+          if (details.velocity.pixelsPerSecond.distance > 20) {
+            _swipe(details.velocity.pixelsPerSecond.dy < 0
+                ? Direction.north
+                : Direction.south);
           }
         },
         onHorizontalDragEnd: (details) {
-          if (gameOver) {
-            _reset();
-          } else {
-            if (details.velocity.pixelsPerSecond.distance > 20) {
-              _swipe(details.velocity.pixelsPerSecond.dx < 0
-                  ? Direction.west
-                  : Direction.east);
-            }
+          if (details.velocity.pixelsPerSecond.distance > 20) {
+            _swipe(details.velocity.pixelsPerSecond.dx < 0
+                ? Direction.west
+                : Direction.east);
           }
         },
         child: game,
@@ -241,13 +233,24 @@ class SnakeGameState extends State<SnakeGame> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                "$score",
+                _getScoreString(),
                 textAlign: TextAlign.left,
               ),
               game
             ]),
       ),
     );
+  }
+
+  String _getScoreString() {
+    String scoreString = "$score";
+    if (score < 10) {
+      return "00" + scoreString;
+    }
+    if (score < 100) {
+      return "0" + scoreString;
+    }
+    return scoreString;
   }
 }
 
