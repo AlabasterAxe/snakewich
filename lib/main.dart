@@ -78,54 +78,75 @@ class SnakePart {
   SnakePart(this.coord, this.apple);
 }
 
-const List<List<bool>> snakeHeadPixels = [
+class TilePixelData {
+  final List<List<bool>> pixels;
+
+  const TilePixelData(this.pixels);
+
+  TilePixelData flipV() => TilePixelData(pixels.reversed.toList());
+  TilePixelData flipH() =>
+      TilePixelData(pixels.map((row) => row.reversed.toList()).toList());
+  TilePixelData rotCCW() => TilePixelData(
+      List.generate(4, (x) => List.generate(4, (y) => pixels[y][x]))
+          .reversed
+          .toList());
+  TilePixelData faceDirection(Direction d) {
+    switch (d) {
+      case Direction.north:
+        return rotCCW();
+      case Direction.east:
+        return this;
+      case Direction.south:
+        return rotCCW().flipV();
+      case Direction.west:
+        return flipH();
+    }
+  }
+}
+
+// These point east by default
+const TilePixelData snakeHeadPixels = TilePixelData([
   [true, false, false, false],
   [false, true, true, false],
   [true, true, true, false],
   [false, false, false, false]
-];
-const List<List<bool>> snakeHeadWithMouthOpenPixels = [
+]);
+const TilePixelData snakeHeadWithMouthOpenPixels = TilePixelData([
   [true, false, true, false],
   [false, true, false, false],
   [true, true, false, false],
   [false, false, true, false]
-];
-const List<List<bool>> snakeBodyPixels = [
+]);
+const TilePixelData snakeBodyPixels = TilePixelData([
   [false, false, false, false],
   [true, true, false, true],
   [true, false, true, true],
   [false, false, false, false]
-];
-const List<List<bool>> snakeBodyWithApplePixels = [
+]);
+const TilePixelData snakeBodyWithApplePixels = TilePixelData([
   [false, true, true, false],
   [true, true, false, true],
   [true, false, true, true],
   [false, true, true, false]
-];
-const List<List<bool>> snakeBodyTurnPixels = [
+]);
+const TilePixelData snakeBodyTurnPixels = TilePixelData([
   [false, false, false, false],
   [false, false, true, true],
   [false, true, false, true],
   [false, true, true, false]
-];
-const List<List<bool>> snakeTailPixels = [
+]);
+const TilePixelData snakeTailPixels = TilePixelData([
   [false, false, false, false],
   [false, false, true, true],
   [true, true, true, true],
   [false, false, false, false]
-];
-const List<List<bool>> applePixels = [
+]);
+const TilePixelData applePixels = TilePixelData([
   [false, true, false, false],
   [true, false, true, false],
   [false, true, false, false],
   [false, false, false, false]
-];
-
-List<List<bool>> flipH(List<List<bool>> v) =>
-    v.map((row) => row.reversed.toList()).toList();
-List<List<bool>> flipV(List<List<bool>> v) => v.reversed.toList();
-List<List<bool>> rotCCW(List<List<bool>> v) =>
-    List.generate(4, (x) => List.generate(4, (y) => v[y][x])).reversed.toList();
+]);
 
 class SnakeGame extends StatefulWidget {
   @override
@@ -271,19 +292,6 @@ class SnakeGameState extends State<SnakeGame> {
   }
 }
 
-List<List<bool>> faceDirection(List<List<bool>> v, Direction d) {
-  switch (d) {
-    case Direction.north:
-      return rotCCW(v);
-    case Direction.east:
-      return v;
-    case Direction.south:
-      return flipV(rotCCW(v));
-    case Direction.west:
-      return flipH(v);
-  }
-}
-
 class SnakeGamePainter extends CustomPainter {
   final int gridSize;
   final List<SnakePart> snake;
@@ -301,14 +309,13 @@ class SnakeGamePainter extends CustomPainter {
   }
 
   void drawSnake(Canvas canvas, double tileSize) {
+    SnakePart head = snake.first;
     drawPixelTile(
         canvas,
-        faceDirection(
-            snake.first.coord.getNeighbor(snakeDirection) == apple
-                ? snakeHeadWithMouthOpenPixels
-                : snakeHeadPixels,
-            snakeDirection),
-        snake.first.coord,
+        head.coord.getNeighbor(snakeDirection) == apple
+            ? snakeHeadWithMouthOpenPixels.faceDirection(snakeDirection)
+            : snakeHeadPixels.faceDirection(snakeDirection),
+        head.coord,
         tileSize);
     for (int segment = 1; segment < snake.length - 1; segment++) {
       drawPixelTile(canvas, getBodySegment(snake, segment),
@@ -316,49 +323,49 @@ class SnakeGamePainter extends CustomPainter {
     }
     drawPixelTile(
         canvas,
-        faceDirection(snakeTailPixels,
+        snakeTailPixels.faceDirection(
             snake.last.coord.directionTo(snake[snake.length - 2].coord)),
         snake.last.coord,
         tileSize);
   }
 
-  List<List<bool>> getBodySegment(List<SnakePart> snake, int segment) {
+  TilePixelData getBodySegment(List<SnakePart> snake, int segment) {
     SnakePart part = snake[segment];
     Direction leadingDirection =
         part.coord.directionTo(snake[segment - 1].coord);
     Direction trailingDirection =
         snake[segment + 1].coord.directionTo(part.coord);
     if (leadingDirection == trailingDirection) {
-      return faceDirection(
-          part.apple ? snakeBodyWithApplePixels : snakeBodyPixels,
-          leadingDirection);
+      return part.apple
+          ? snakeBodyWithApplePixels.faceDirection(leadingDirection)
+          : snakeBodyPixels.faceDirection(leadingDirection);
     }
     switch (leadingDirection) {
       case Direction.north:
         return trailingDirection == Direction.east
-            ? flipV(flipH(snakeBodyTurnPixels))
-            : flipV(snakeBodyTurnPixels);
+            ? snakeBodyTurnPixels.flipH().flipV()
+            : snakeBodyTurnPixels.flipV();
       case Direction.east:
         return trailingDirection == Direction.north
             ? snakeBodyTurnPixels
-            : flipV(snakeBodyTurnPixels);
+            : snakeBodyTurnPixels.flipV();
       case Direction.south:
         return trailingDirection == Direction.east
-            ? flipH(snakeBodyTurnPixels)
+            ? snakeBodyTurnPixels.flipH()
             : snakeBodyTurnPixels;
       case Direction.west:
         return trailingDirection == Direction.north
-            ? flipH(snakeBodyTurnPixels)
-            : flipV(flipH(snakeBodyTurnPixels));
+            ? snakeBodyTurnPixels.flipH()
+            : snakeBodyTurnPixels.flipH().flipV();
     }
   }
 
   void drawPixelTile(
-      Canvas canvas, List<List<bool>> pixels, Coord c, double size) {
+      Canvas canvas, TilePixelData pixelData, Coord c, double size) {
     double ps = size / 4;
     for (int py = 0; py < 4; py++) {
       for (int px = 0; px < 4; px++) {
-        if (pixels[py][px]) {
+        if (pixelData.pixels[py][px]) {
           canvas.drawRect(
               Rect.fromLTWH(c.x * size + px * ps, c.y * size + py * ps, ps, ps)
                   .deflate(.1),
