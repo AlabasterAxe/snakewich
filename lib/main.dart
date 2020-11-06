@@ -29,10 +29,13 @@ class SnakeApp extends StatelessWidget {
 enum Direction { north, east, south, west }
 
 extension DirectionUtil on Direction {
-  bool isOrthogonal(Direction d) =>
-      this == Direction.north || this == Direction.south
-          ? d == Direction.east || d == Direction.west
-          : d == Direction.south || d == Direction.north;
+  bool isOrthogonal(Direction d) {
+    if (this == Direction.north || this == Direction.south) {
+      return d == Direction.east || d == Direction.west;
+    } else {
+      return d == Direction.south || d == Direction.north;
+    }
+  }
 }
 
 class Coord {
@@ -41,17 +44,18 @@ class Coord {
 
   Coord(this.x, this.y);
 
-  Coord getNeighbor(Direction d) => Coord(
-      d == Direction.east
-          ? x + 1
-          : d == Direction.west
-              ? x - 1
-              : x,
-      d == Direction.north
-          ? y - 1
-          : d == Direction.south
-              ? y + 1
-              : y);
+  Coord getNeighbor(Direction d) {
+    switch (d) {
+      case Direction.north:
+        return Coord(x, y - 1);
+      case Direction.east:
+        return Coord(x + 1, y);
+      case Direction.south:
+        return Coord(x, y + 1);
+      case Direction.west:
+        return Coord(x - 1, y);
+    }
+  }
 
   Direction directionTo(Coord c) {
     if (c.y == y) {
@@ -73,6 +77,55 @@ class SnakePart {
 
   SnakePart(this.coord, this.apple);
 }
+
+const List<List<bool>> snakeHeadPixels = [
+  [true, false, false, false],
+  [false, true, true, false],
+  [true, true, true, false],
+  [false, false, false, false]
+];
+const List<List<bool>> snakeHeadWithMouthOpenPixels = [
+  [true, false, true, false],
+  [false, true, false, false],
+  [true, true, false, false],
+  [false, false, true, false]
+];
+const List<List<bool>> snakeBodyPixels = [
+  [false, false, false, false],
+  [true, true, false, true],
+  [true, false, true, true],
+  [false, false, false, false]
+];
+const List<List<bool>> snakeBodyWithApplePixels = [
+  [false, true, true, false],
+  [true, true, false, true],
+  [true, false, true, true],
+  [false, true, true, false]
+];
+const List<List<bool>> snakeBodyTurnPixels = [
+  [false, false, false, false],
+  [false, false, true, true],
+  [false, true, false, true],
+  [false, true, true, false]
+];
+const List<List<bool>> snakeTailPixels = [
+  [false, false, false, false],
+  [false, false, true, true],
+  [true, true, true, true],
+  [false, false, false, false]
+];
+const List<List<bool>> applePixels = [
+  [false, true, false, false],
+  [true, false, true, false],
+  [false, true, false, false],
+  [false, false, false, false]
+];
+
+List<List<bool>> flipH(List<List<bool>> v) =>
+    v.map((row) => row.reversed.toList()).toList();
+List<List<bool>> flipV(List<List<bool>> v) => v.reversed.toList();
+List<List<bool>> rotCCW(List<List<bool>> v) =>
+    List.generate(4, (x) => List.generate(4, (y) => v[y][x])).reversed.toList();
 
 class SnakeGame extends StatefulWidget {
   @override
@@ -147,12 +200,17 @@ class SnakeGameState extends State<SnakeGame> {
   }
 
   Coord _getCoordForApple() {
-    List<Coord> eligibleApplePositions = List.generate(
-            gridSize, (y) => List.generate(gridSize, (x) => Coord(x, y)))
-        .expand((e) => e)
-        .where((e) => !snake.map((e) => e.coord).contains(e))
-        .toList();
-    return eligibleApplePositions[r.nextInt(eligibleApplePositions.length)];
+    List<Coord> eligibleAppleCoords = [];
+    List<Coord> snakeCoords = snake.map((e) => e.coord).toList();
+    for (int y = 0; y < gridSize; y++) {
+      for (int x = 0; x < gridSize; x++) {
+        Coord c = Coord(x, y);
+        if (!snakeCoords.contains(c)) {
+          eligibleAppleCoords.add(c);
+        }
+      }
+    }
+    return eligibleAppleCoords[r.nextInt(eligibleAppleCoords.length)];
   }
 
   void _swipe(DragEndDetails details) {
@@ -175,7 +233,7 @@ class SnakeGameState extends State<SnakeGame> {
   @override
   Widget build(BuildContext context) {
     Widget game = CustomPaint(
-        painter: SnakePainter(
+        painter: SnakeGamePainter(
             gridSize: gridSize,
             snake: snake,
             snakeDirection: snakeDirection,
@@ -213,55 +271,6 @@ class SnakeGameState extends State<SnakeGame> {
   }
 }
 
-const List<List<bool>> snakeHeadPixels = [
-  [true, false, false, false],
-  [false, true, true, false],
-  [true, true, true, false],
-  [false, false, false, false]
-];
-const List<List<bool>> snakeHeadWithMouthOpenPixels = [
-  [true, false, true, false],
-  [false, true, false, false],
-  [true, true, false, false],
-  [false, false, true, false]
-];
-const List<List<bool>> snakeBodyPixels = [
-  [false, false, false, false],
-  [true, true, false, true],
-  [true, false, true, true],
-  [false, false, false, false]
-];
-const List<List<bool>> snakeBodyWithApplePixels = [
-  [false, true, true, false],
-  [true, true, false, true],
-  [true, false, true, true],
-  [false, true, true, false]
-];
-const List<List<bool>> snakeBodyTurnPixels = [
-  [false, false, false, false],
-  [false, false, true, true],
-  [false, true, false, true],
-  [false, true, true, false]
-];
-const List<List<bool>> snakeTailPixels = [
-  [false, false, false, false],
-  [false, false, true, true],
-  [true, true, true, true],
-  [false, false, false, false]
-];
-const List<List<bool>> applePixels = [
-  [false, true, false, false],
-  [true, false, true, false],
-  [false, true, false, false],
-  [false, false, false, false]
-];
-
-List<List<bool>> flipH(List<List<bool>> v) =>
-    v.map((row) => row.reversed.toList()).toList();
-List<List<bool>> flipV(List<List<bool>> v) => v.reversed.toList();
-List<List<bool>> rotCCW(List<List<bool>> v) =>
-    List.generate(4, (x) => List.generate(4, (y) => v[y][x])).reversed.toList();
-
 List<List<bool>> faceDirection(List<List<bool>> v, Direction d) {
   switch (d) {
     case Direction.north:
@@ -275,13 +284,14 @@ List<List<bool>> faceDirection(List<List<bool>> v, Direction d) {
   }
 }
 
-class SnakePainter extends CustomPainter {
+class SnakeGamePainter extends CustomPainter {
   final int gridSize;
   final List<SnakePart> snake;
   final Direction snakeDirection;
   final Coord apple;
 
-  SnakePainter({this.gridSize, this.snake, this.snakeDirection, this.apple});
+  SnakeGamePainter(
+      {this.gridSize, this.snake, this.snakeDirection, this.apple});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -314,27 +324,30 @@ class SnakePainter extends CustomPainter {
 
   List<List<bool>> getBodySegment(List<SnakePart> snake, int segment) {
     SnakePart part = snake[segment];
-    Direction head = part.coord.directionTo(snake[segment - 1].coord);
-    Direction tail = snake[segment + 1].coord.directionTo(part.coord);
-    if (head == tail) {
+    Direction leadingDirection =
+        part.coord.directionTo(snake[segment - 1].coord);
+    Direction trailingDirection =
+        snake[segment + 1].coord.directionTo(part.coord);
+    if (leadingDirection == trailingDirection) {
       return faceDirection(
-          part.apple ? snakeBodyWithApplePixels : snakeBodyPixels, head);
+          part.apple ? snakeBodyWithApplePixels : snakeBodyPixels,
+          leadingDirection);
     }
-    switch (head) {
+    switch (leadingDirection) {
       case Direction.north:
-        return tail == Direction.east
+        return trailingDirection == Direction.east
             ? flipV(flipH(snakeBodyTurnPixels))
             : flipV(snakeBodyTurnPixels);
       case Direction.east:
-        return tail == Direction.north
+        return trailingDirection == Direction.north
             ? snakeBodyTurnPixels
             : flipV(snakeBodyTurnPixels);
       case Direction.south:
-        return tail == Direction.east
+        return trailingDirection == Direction.east
             ? flipH(snakeBodyTurnPixels)
             : snakeBodyTurnPixels;
       case Direction.west:
-        return tail == Direction.north
+        return trailingDirection == Direction.north
             ? flipH(snakeBodyTurnPixels)
             : flipV(flipH(snakeBodyTurnPixels));
     }
@@ -356,7 +369,7 @@ class SnakePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(SnakePainter old) =>
+  bool shouldRepaint(SnakeGamePainter old) =>
       old.gridSize != gridSize ||
       old.snake != snake ||
       old.snakeDirection != snakeDirection ||
