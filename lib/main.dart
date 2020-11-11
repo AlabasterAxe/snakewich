@@ -278,8 +278,7 @@ class SnakeGameState extends State<SnakeGame> {
               Text("$score"),
               GestureDetector(
                 onTap: gameOver ? _reset : null,
-                onVerticalDragEnd: gameOver ? null : _swipe,
-                onHorizontalDragEnd: gameOver ? null : _swipe,
+                onPanEnd: gameOver ? null : _swipe,
                 child: Container(
                     padding: EdgeInsets.all(4),
                     decoration: BoxDecoration(
